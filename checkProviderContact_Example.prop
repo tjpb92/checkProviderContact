@@ -1,0 +1,37 @@
+# Properties for production environnement
+prod.webserver.name=Extranet - Production
+prod.webserver.ip=1.2.3.4
+prod.webserver.port=80
+prod.webserver.path=api/xxx/
+prod.webserver.login=login
+prod.webserver.passwd=password
+
+prod.dbserver.name=production
+prod.dbserver.ip=1.2.3.5
+prod.dbserver.port=1234
+prod.dbserver.dbname=db
+prod.dbserver.login=login
+prod.dbserver.passwd=passwoord
+prod.dbserver.informixserver=dbtcp
+prod.dbserver.drivername=Informix
+prod.dbserver.driverclass=com.informix.jdbc.IfxDriver
+prod.dbserver.nb.thread=8
+
+# Properties for pre-production environnement
+pre-prod.webserver.name=Extranet - Pre-Production
+pre-prod.webserver.ip=1.2.3.6
+pre-prod.webserver.port=80
+pre-prod.webserver.path=api/yyy/
+pre-prod.webserver.login=login
+pre-prod.webserver.passwd=password
+
+pre-prod.dbserver.name=pre-prod
+pre-prod.dbserver.ip=1.2.3.7
+pre-prod.dbserver.port=1234
+pre-prod.dbserver.dbname=db
+pre-prod.dbserver.login=logine
+pre-prod.dbserver.passwd=password
+pre-prod.dbserver.informixserver=dbtcp
+pre-prod.dbserver.drivername=Informix
+pre-prod.dbserver.driverclass=com.informix.jdbc.IfxDriver
+pre-prod.dbserver.nb.thread=8
