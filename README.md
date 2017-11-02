@@ -7,7 +7,7 @@ Le but de ce projet est de s'assurer de la cohérence entre la base de données 
 
 Lorsqu'une incohérence est détectée, le programme apporte une correction
 
-##Utilisation:
+## Utilisation:
 ```
 java checkProviderContact [-dbserver db] [-webserver web] -company identifiant [-d] [-t] 
 ```
@@ -18,11 +18,11 @@ où :
 * ```-d``` le programme s'exécute en mode débug, il est beaucoup plus verbeux. Désactivé par défaut (paramètre optionnel).
 * ```-t``` le programme s'exécute en mode test, les transactions en base de données ne sont pas faites. Désactivé par défaut (paramètre optionnel).
 
-##Pré-requis :
+## Pré-requis :
 - Java 6 ou supérieur.
 - JDBC Informix
 
-##Fichier des paramètres : 
+## Fichier des paramètres : 
 
 Ce fichier permet de spécifier les paramètres d'accès aux différentes bases de données.
 
@@ -32,5 +32,5 @@ Ce fichier est nommé : *checkProviderContact.prop*.
 
 Le fichier *checkProviderContact_Example.prop* est fourni à titre d'exemple.
 
-##Références:
+## Références:
 
