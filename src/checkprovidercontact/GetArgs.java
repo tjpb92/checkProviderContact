@@ -5,8 +5,9 @@ import java.util.Date;
 /**
  * Cette classe sert à vérifier et à récupérer les arguments passés en ligne de
  * commande au programme checkProviderContact.
+ *
  * @author Thierry Baribaud
- * @version 0.01
+ * @version 0.02
  */
 public class GetArgs {
 
@@ -23,11 +24,17 @@ public class GetArgs {
     private String dbServerType = "pre-prod";
 
     /**
-     * company : identifiant unique du cllient dans la base de données 
-     * métier. Paramètre obligatoire.
+     * company : identifiant unique du cllient dans la base de données métier.
+     * Paramètre obligatoire.
      */
     private int company = 0;
-    
+
+    /**
+     * fixAnomaly : active ou non la correction des anomalies (true/false).
+     * Valeur par défaut : false.
+     */
+    private boolean fixAnomaly = false;
+
     /**
      * debugMode : fonctionnement du programme en mode debug (true/false).
      * Valeur par défaut : false.
@@ -47,13 +54,13 @@ public class GetArgs {
         return (webServerType);
     }
 
-    /** 
+    /**
      * @return company : identifiant unique du client.
      */
     public int getCompany() {
         return (company);
     }
-    
+
     /**
      * @return debugMode : retourne le mode de fonctionnement debug.
      */
@@ -69,6 +76,13 @@ public class GetArgs {
     }
 
     /**
+     * @return fixAnomaly : retourne si les corrections sont activées ou non.
+     */
+    public boolean getFixAnomaly() {
+        return (fixAnomaly);
+    }
+
+    /**
      * @param webServerType : définit le serveur web à la source.
      */
     public void setWebServerType(String webServerType) {
@@ -81,7 +95,15 @@ public class GetArgs {
     public void setCompany(int company) {
         this.company = company;
     }
-    
+
+    /**
+     * @param fixAnomaly : définit le mode de correction d'anomalie
+     * (true/false).
+     */
+    public void setFixAnomaly(boolean fixAnomaly) {
+        this.fixAnomaly = fixAnomaly;
+    }
+
     /**
      * @param debugMode : fonctionnement du programme en mode debug
      * (true/false).
@@ -151,6 +173,8 @@ public class GetArgs {
                     throw new GetArgsException("Référence client non définie");
                 }
 
+            } else if (args[i].equals("-fix")) {
+                setFixAnomaly(true);
             } else if (args[i].equals("-d")) {
                 setDebugMode(true);
             } else if (args[i].equals("-t")) {
@@ -160,7 +184,7 @@ public class GetArgs {
             }
             i++;
         }
-    
+
         if ((company = getCompany()) == 0) {
             usage();
             throw new GetArgsException("Client non définit");
@@ -173,7 +197,7 @@ public class GetArgs {
     public static void usage() {
         System.out.println("Usage : java checkProviderContact [-webserver prod|pre-prod]"
                 + " [-dbserver prod|pre-prod]"
-                + " -companies id_company"
+                + " -companies id_company [-fix]"
                 + " [-d] [-t]");
     }
 
@@ -201,6 +225,7 @@ public class GetArgs {
         return "GetArg: {"
                 + "webServerType:" + getWebServerType()
                 + ", dbServerType:" + getDbServerType()
+                + ", fixAnomaly:" + getFixAnomaly()
                 + ", debugMode:" + getDebugMode()
                 + ", testMode:" + getTestMode()
                 + "}";

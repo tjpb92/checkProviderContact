@@ -4,14 +4,34 @@ import bdd.Ftoubib;
 import bdd.FtoubibDAO;
 import bdd.Furgent;
 import bdd.FurgentDAO;
+import bkgpi2a.HttpsClient;
 import bkgpi2a.Identifiants;
+import bkgpi2a.ProviderContact;
 import bkgpi2a.WebServer;
 import bkgpi2a.WebServerException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Footer;
+import org.apache.poi.ss.usermodel.Header;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.PaperSize;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import utils.ApplicationProperties;
 import utils.DBManager;
 import utils.DBServer;
@@ -24,7 +44,7 @@ import utils.Md5;
  * corrections peuvent être effectuées.
  *
  * @author Thierry Baribaud
- * @version 0.01
+ * @version 0.02
  */
 public class CheckProviderContact {
 
@@ -79,13 +99,14 @@ public class CheckProviderContact {
      * @throws checkprovidercontact.GetArgsException en cas d'erreur avec les
      * paramètres en ligne de commande
      */
-    public CheckProviderContact(String[] args) throws GetArgsException, IOException, WebServerException, DBServerException, ClassNotFoundException, SQLException {
+    public CheckProviderContact(String[] args) throws GetArgsException, IOException, WebServerException, DBServerException, ClassNotFoundException, SQLException, Exception {
 
         GetArgs getArgs;
         ApplicationProperties applicationProperties;
         WebServer webServer;
         DBServer dbServer;
         DBManager dBManager;
+        HttpsClient httpsClient;
         Connection connection;
 
         System.out.println("Création d'une instance de CheckProviderContact ...");
@@ -121,6 +142,12 @@ public class CheckProviderContact {
             System.out.println(getDbId());
         }
 
+        System.out.println("Ouverture de la connexion au site Web : " + webServer.getName());
+        httpsClient = new HttpsClient(webServer.getIpAddress(), getWebId(), debugMode, testMode);
+
+        System.out.println("Authentification en cours ...");
+        httpsClient.sendPost(HttpsClient.REST_API_PATH + HttpsClient.LOGIN_CMDE);
+
         System.out.println("Ouverture de la connexion au serveur de base de données : " + dbServer.getName());
         dBManager = new DBManager(dbServer);
 
@@ -128,24 +155,68 @@ public class CheckProviderContact {
         connection = dBManager.getConnection();
 
         // Compare la base de données locale à celle de l'extranet
-        compareLocaleDb_2_WebDb(connection, getCompany());
+        compareLocaleDb_2_WebDb(connection, getCompany(), httpsClient);
 
         // Compare la base de données de l'extranet à celle en local
         compareWebDb_2_LocaleDb(connection, getCompany());
     }
 
-    private void compareLocaleDb_2_WebDb(Connection connection, int company) {
+    private void compareLocaleDb_2_WebDb(Connection connection, int company, HttpsClient httpsClient) {
         Furgent emergencyService;
         FurgentDAO furgentDAO;
-        Ftoubib providerContact;
+        Ftoubib providerContactFromDB;
         FtoubibDAO ftoubibDAO;
         int i;
         int j;
         String aggregateUid;
+        String command;
+        ObjectMapper objectMapper;
+        String response;
+        ProviderContact providerContactFromWeb;
+        FileOutputStream out;
+        XSSFWorkbook classeur;
+        XSSFSheet feuille;
+        XSSFRow titre;
+        XSSFCell cell;
+        XSSFRow ligne;
+        XSSFCellStyle cellStyle;
+        XSSFCellStyle titleStyle;
+        XSSFCellStyle cellStyle2;
 
-        System.out.println("Comparaison de la base de données locale à celle de l'extranet ...");
+        System.out.println("Comparaison de la base de données locale à celle de l'Extranet ...");
+
+//      Création d'un classeur Excel
+        classeur = new XSSFWorkbook();
+
+        // Style de cellule avec bordure noire
+        cellStyle = classeur.createCellStyle();
+        cellStyle.setBorderBottom(BorderStyle.THIN);
+        cellStyle.setBottomBorderColor(IndexedColors.BLACK.getIndex());
+        cellStyle.setBorderLeft(BorderStyle.THIN);
+        cellStyle.setLeftBorderColor(IndexedColors.BLACK.getIndex());
+        cellStyle.setBorderRight(BorderStyle.THIN);
+        cellStyle.setRightBorderColor(IndexedColors.BLACK.getIndex());
+        cellStyle.setBorderTop(BorderStyle.THIN);
+        cellStyle.setTopBorderColor(IndexedColors.BLACK.getIndex());
+
+        // Style pour le titre
+        titleStyle = (XSSFCellStyle) cellStyle.clone();
+        titleStyle.setFillBackgroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        titleStyle.setFillPattern(FillPatternType.LESS_DOTS);
+//        titleStyle.setFillForegroundColor(IndexedColors.WHITE.getIndex());
+
+        // Style pour les cellules à renvoi à la ligne automatique
+        cellStyle2 = (XSSFCellStyle) cellStyle.clone();
+        cellStyle2.setAlignment(HorizontalAlignment.JUSTIFY);
+        cellStyle2.setVerticalAlignment(VerticalAlignment.JUSTIFY);
 
         try {
+            command = HttpsClient.REST_API_PATH + HttpsClient.PROVIDER_CONTACTS_CMDE;
+            if (debugMode) {
+                System.out.println("  Commande pour récupérer les providerContacts : " + command);
+            }
+            objectMapper = new ObjectMapper();
+
             furgentDAO = new FurgentDAO(connection);
             if (company > 0) {
                 furgentDAO.filterById(company);
@@ -159,21 +230,118 @@ public class CheckProviderContact {
                 System.out.println("Client(" + i + ")=" + emergencyService);
                 aggregateUid = Md5.encode("u:" + emergencyService.getUnum());
                 System.out.println("  aggregateUid:" + aggregateUid);
+
+                feuille = classeur.createSheet(emergencyService.getUname() + "_" + emergencyService.getUnum());
+                
+                // Ligne de titre
+                titre = feuille.createRow(0);
+                cell = titre.createCell((short) 0);
+                cell.setCellStyle(titleStyle);
+                cell.setCellValue("Nom");
+                cell = titre.createCell((short) 1);
+                cell.setCellStyle(titleStyle);
+                cell.setCellValue("Prénom");
+                cell = titre.createCell((short) 2);
+                cell.setCellStyle(titleStyle);
+                cell.setCellValue("Id");
+                cell = titre.createCell((short) 3);
+                cell.setCellStyle(titleStyle);
+                cell.setCellValue("UUID");
+                cell = titre.createCell((short) 4);
+                cell.setCellStyle(titleStyle);
+                cell.setCellValue("Etat");
+
                 ftoubibDAO = new FtoubibDAO(connection);
                 ftoubibDAO.filterByGid(company);
                 ftoubibDAO.orderBy("tlname, tfname");
                 ftoubibDAO.setSelectPreparedStatement();
-                j=0;
-                while((providerContact=ftoubibDAO.select()) != null) {
+                j = 0;
+                while ((providerContactFromDB = ftoubibDAO.select()) != null) {
                     j++;
-                    System.out.println("  proviserContact(" + j + ")=" 
-                            + providerContact.getTlname()
-                            + " " + providerContact.getTfname()
-                            + ", id=" + providerContact.getTnum()
-                            + ", uid=" + providerContact.getTUuid());
+
+                    ligne = feuille.createRow(j);
+
+                    cell = ligne.createCell(0);
+                    cell.setCellValue(providerContactFromDB.getTlname());
+                    cell.setCellStyle(cellStyle);
+
+                    cell = ligne.createCell(1);
+                    cell.setCellValue(providerContactFromDB.getTfname());
+                    cell.setCellStyle(cellStyle);
+
+                    cell = ligne.createCell(2);
+                    cell.setCellValue(providerContactFromDB.getTnum());
+                    cell.setCellStyle(cellStyle);
+
+                    cell = ligne.createCell(3);
+                    cell.setCellValue(providerContactFromDB.getTUuid());
+                    cell.setCellStyle(cellStyle);
+
+                    System.out.println("  proviserContact(" + j + ")="
+                            + providerContactFromDB.getTlname()
+                            + " " + providerContactFromDB.getTfname()
+                            + ", id=" + providerContactFromDB.getTnum()
+                            + ", uid=" + providerContactFromDB.getTUuid());
+
+                    cell = ligne.createCell(4);
+                    cell.setCellStyle(cellStyle);
+                    try {
+                        httpsClient.sendGet(command + "/" + providerContactFromDB.getTUuid());
+                        if (httpsClient.getResponseCode() == 200) {
+                            response = httpsClient.getResponse();
+//                            System.out.println("  Réponse=" + response);
+                            providerContactFromWeb = objectMapper.readValue(response, ProviderContact.class);
+                            if (providerContactFromWeb != null) {
+                                System.out.println("  Found providerContact:" + providerContactFromWeb);
+                                cell.setCellValue("Trouvé");
+                            } else {
+                                System.out.println("  WARNING : providerContact not found #1");
+                                cell.setCellValue("Non trouvé #1");
+                            }
+                        } else {
+                            System.out.println("  WARNING : providerContact not found #2");
+                            cell.setCellValue("Non trouvé #2");
+
+                        }
+                    } catch (Exception ex) {
+                        Logger.getLogger(HttpsClient.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
                 }
                 ftoubibDAO.closeSelectPreparedStatement();
 //                ftoubibDAO.close();
+                
+                // Ajustement automatique de la largeur des 5 premières colonnes
+                for (int k = 0; k < 5; k++) {
+                    feuille.autoSizeColumn(k);
+                }
+
+                    // Largeur des deux dernières colonnes fixées à 50 = 12 800 / 256
+        //            feuille.setColumnWidth((int)6, (int)12800);
+        //            feuille.setColumnWidth((int)7, (int)12800);
+                // Format A4 en sortie
+                feuille.getPrintSetup().setPaperSize(PaperSize.A4_PAPER);
+
+                // Orientation paysage
+                feuille.getPrintSetup().setLandscape(true);
+
+                // Ajustement à une page en largeur
+                feuille.setFitToPage(true);
+                feuille.getPrintSetup().setFitWidth((short) 1);
+                feuille.getPrintSetup().setFitHeight((short) 0);
+
+                // En-tête et pied de page
+                Header header = feuille.getHeader();
+                header.setLeft("Liste des intervenants pour " + emergencyService.getUname());
+                header.setRight("&F");
+
+                Footer footer = feuille.getFooter();
+                footer.setLeft("Documentation confidentielle Anstel");
+                footer.setCenter("Page &P / &N");
+                footer.setRight("&D");
+
+                // Ligne à répéter en haut de page
+                feuille.setRepeatingRows(CellRangeAddress.valueOf("1:1"));
             }
             furgentDAO.closeSelectPreparedStatement();
 //            furgentDAO.close();
@@ -181,6 +349,20 @@ public class CheckProviderContact {
             Logger.getLogger(CheckProviderContact.class.getName()).log(Level.SEVERE, null, exception);
         } catch (SQLException exception) {
             Logger.getLogger(CheckProviderContact.class.getName()).log(Level.SEVERE, null, exception);
+        }
+
+        // Enregistrement du classeur dans un fichier
+        try {
+//            out = new FileOutputStream(new File(path + "\\" + filename));
+            out = new FileOutputStream(new File("checkProviderContact.xlsx"));
+            classeur.write(out);
+            out.close();
+//            System.out.println("Fichier Excel " + filename + " créé dans " + path);
+            System.out.println("Fichier Excel checkProviderContact.xlsx créé");
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(CheckProviderContact.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(CheckProviderContact.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
